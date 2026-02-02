@@ -10,6 +10,7 @@ const App: React.FC = () => {
   const [speed, setSpeed] = useState(INITIAL_CONFIG.speed);
   const [cellSize, setCellSize] = useState(INITIAL_CONFIG.cellSize);
   const [showDiagnostics, setShowDiagnostics] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   const [fps, setFps] = useState(0);
   const [solutionPath, setSolutionPath] = useState<Cell[]>([]);
   
@@ -19,6 +20,38 @@ const App: React.FC = () => {
   const requestRef = useRef<number | undefined>(undefined);
   const stepAccumulatorRef = useRef(0);
   const lastTimeRef = useRef(performance.now());
+
+  // Audio refs
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  const playStepSound = useCallback(() => {
+    if (isMuted) return;
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    const ctx = audioContextRef.current;
+    if (ctx.state === 'suspended') ctx.resume();
+
+    // Limit audio triggers at very high speeds to prevent distortion
+    if (speed > 300 && Math.random() > 0.1) return;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    // Frequency based on walker's "height" in the grid for a musical effect
+    const freq = 150 + (generatorRef.current?.current?.i || 0) * 5;
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    
+    gain.gain.setValueAtTime(0.02, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.05);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.05);
+  }, [isMuted, speed]);
 
   const initGenerator = useCallback(() => {
     const canvas = canvasRef.current;
@@ -49,8 +82,8 @@ const App: React.FC = () => {
     const w = cellSize;
     const gridLineWidth = cellSize < 10 ? 0.5 : 1;
 
-    // Background cells
-    ctx.fillStyle = '#0f172a';
+    // Background cells - Darker neutral black
+    ctx.fillStyle = '#050505';
     for (const cell of gen.grid) {
       if (cell.visited) {
         ctx.fillRect(cell.j * w, cell.i * w, w, w);
@@ -149,17 +182,15 @@ const App: React.FC = () => {
     const delta = now - lastTimeRef.current;
     lastTimeRef.current = now;
     
-    // Smooth FPS calculation
     const currentFps = 1000 / Math.max(1, delta);
     setFps(prev => prev * 0.95 + currentFps * 0.05);
 
     if (status === AlgorithmStatus.GENERATING && generatorRef.current) {
-      // Linear speed logic: speed is "steps per second"
-      // We accumulate steps based on elapsed time
       stepAccumulatorRef.current += speed * (delta / 1000);
 
       while (stepAccumulatorRef.current >= 1) {
         generatorRef.current.step();
+        playStepSound();
         stepAccumulatorRef.current -= 1;
         if (generatorRef.current.finished) {
           setStatus(AlgorithmStatus.FINISHED);
@@ -172,7 +203,7 @@ const App: React.FC = () => {
     
     draw();
     requestRef.current = requestAnimationFrame(animate);
-  }, [status, speed, draw]);
+  }, [status, speed, draw, playStepSound]);
 
   useEffect(() => {
     requestRef.current = requestAnimationFrame(animate);
@@ -191,15 +222,17 @@ const App: React.FC = () => {
   }, [initGenerator]);
 
   return (
-    <div className="flex w-full h-screen bg-slate-950 overflow-hidden font-sans">
+    <div className="flex w-full h-screen bg-black overflow-hidden font-sans">
       <ControlPanel 
         status={status}
         speed={speed}
         cellSize={cellSize}
         showDiagnostics={showDiagnostics}
+        isMuted={isMuted}
         setSpeed={setSpeed}
         setCellSize={setCellSize}
         setShowDiagnostics={setShowDiagnostics}
+        setIsMuted={setIsMuted}
         onStart={() => setStatus(AlgorithmStatus.GENERATING)}
         onPause={() => setStatus(AlgorithmStatus.PAUSED)}
         onReset={() => {
@@ -207,9 +240,9 @@ const App: React.FC = () => {
         }}
       />
 
-      <main ref={containerRef} className="flex-1 relative overflow-hidden bg-slate-950">
-        <div className="absolute inset-0 pointer-events-none opacity-[0.02]" 
-             style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+      <main ref={containerRef} className="flex-1 relative overflow-hidden bg-black">
+        <div className="absolute inset-0 pointer-events-none opacity-[0.03]" 
+             style={{ backgroundImage: 'radial-gradient(#ffffff22 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
         
         <canvas 
           ref={canvasRef}
@@ -217,9 +250,9 @@ const App: React.FC = () => {
         />
 
         <div className="absolute bottom-8 right-8 flex flex-col items-end gap-2 pointer-events-none transition-all duration-500">
-          <div className="px-5 py-2.5 bg-slate-900/70 backdrop-blur-md border border-slate-700/50 rounded-full flex items-center gap-3 shadow-2xl">
+          <div className="px-5 py-2.5 bg-black/60 backdrop-blur-md border border-white/10 rounded-full flex items-center gap-3 shadow-2xl">
             <div className={`w-2 h-2 rounded-full animate-pulse shadow-[0_0_10px] ${status === AlgorithmStatus.FINISHED ? 'bg-emerald-400 shadow-emerald-400' : 'bg-cyan-400 shadow-cyan-400'}`}></div>
-            <span className="text-[10px] font-bold text-slate-300 tracking-widest uppercase">
+            <span className="text-[10px] font-bold text-white/70 tracking-widest uppercase">
               {status === AlgorithmStatus.FINISHED ? 'Structural Solve Complete' : 
                status === AlgorithmStatus.GENERATING ? 'Generating Neural Lattice...' : 
                status === AlgorithmStatus.PAUSED ? 'Temporal Sequence Suspended' : 'Kernel Engine Standby'}
@@ -228,14 +261,14 @@ const App: React.FC = () => {
         </div>
 
         {showDiagnostics && (
-          <div className="absolute top-8 right-8 text-right pointer-events-none bg-slate-950/60 p-4 rounded-xl border border-slate-700/50 backdrop-blur-md transition-all duration-300 animate-in fade-in slide-in-from-top-2">
-            <p className="text-[10px] text-slate-400 font-mono tracking-tighter leading-relaxed">
-              <span className="text-cyan-400 font-bold uppercase tracking-[0.2em] block mb-2 border-b border-cyan-400/20 pb-1">System Diagnostics</span>
+          <div className="absolute top-8 right-8 text-right pointer-events-none bg-black/60 p-4 rounded-xl border border-white/10 backdrop-blur-md transition-all duration-300 animate-in fade-in slide-in-from-top-2">
+            <p className="text-[10px] text-white/50 font-mono tracking-tighter leading-relaxed">
+              <span className="text-cyan-400 font-bold uppercase tracking-[0.2em] block mb-2 border-b border-white/5 pb-1">System Diagnostics</span>
               GRID_RES: {generatorRef.current?.cols} x {generatorRef.current?.rows}<br/>
               GEOM_DIM: {cellSize}px<br/>
               STACK_PTR: {generatorRef.current?.stack.length}<br/>
               SOLV_NODES: {solutionPath.length}<br/>
-              <span className={`font-bold ${fps < 30 ? 'text-red-400' : 'text-slate-500'}`}>
+              <span className={`font-bold ${fps < 30 ? 'text-red-400' : 'text-white/30'}`}>
                 REND_FPS: {Math.round(fps)}
               </span>
             </p>

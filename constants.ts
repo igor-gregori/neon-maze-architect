@@ -1,12 +1,12 @@
 
 export const COLORS = {
-  bg: '#020617',
-  wallSubtle: '#1e293b',
-  neonCyan: '#22d3ee',
-  neonMagenta: '#f472b6',
-  neonYellow: '#fde047',
-  textMuted: '#94a3b8',
-  textMain: '#f8fafc'
+  bg: '#000000',
+  wallSubtle: '#111111',
+  neonCyan: '#00f2ff',
+  neonMagenta: '#ff007a',
+  neonYellow: '#fff200',
+  textMuted: '#555555',
+  textMain: '#ffffff'
 };
 
 export const INITIAL_CONFIG = {
