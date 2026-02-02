@@ -10,8 +10,8 @@ export const COLORS = {
 };
 
 export const INITIAL_CONFIG = {
-  cellSize: 25,
-  speed: 120, // 120 steps per second
+  cellSize: 40,
+  speed: 100, // steps per second
   neonCyan: COLORS.neonCyan,
   neonMagenta: COLORS.neonMagenta,
   neonYellow: COLORS.neonYellow
