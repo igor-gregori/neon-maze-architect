@@ -6,6 +6,10 @@
   <img src="./assets/preview.png" alt="Project Logo" width="1000">
 </p>
 
+<p align="center">
+  <a href="https://igor-gregori.github.io/neon-maze-architect/" target="_blank">🔗 Live demo: https://igor-gregori.github.io/neon-maze-architect/</a>
+</p>
+
 ## 🚀 Project Overview
 
 Neon Maze Architect is a web app that visualizes the Recursive Backtracker (DFS) algorithm building a "perfect" maze (no loops, every cell reachable). The visualization shows the algorithm exploring, hitting dead ends, and backtracking while you tweak the visual style and algorithm speed.
